@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Build & Publish Binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            artifact_name: heikal-linux-amd64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: heikal-macos-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: heikal-macos-arm64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: heikal-windows-amd64.exe
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install MUSL Tools (Linux only)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: Compile Release Binary
+        run: |
+          cargo build --release --target ${{ matrix.target }}
+        shell: bash
+
+      - name: Install Packaging Tools (Linux only)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb,cargo-generate-rpm
+
+      - name: Build Debian and RPM packages (Linux only)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          # Build deb package (using the prebuilt musl binary)
+          cargo deb --target x86_64-unknown-linux-musl --no-build
+          
+          # Build rpm package (using the prebuilt musl binary)
+          cargo generate-rpm --target x86_64-unknown-linux-musl
+        shell: bash
+
+      - name: Rename & Package Binary
+        run: |
+          mkdir dist
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            mv target/${{ matrix.target }}/release/heikal.exe dist/${{ matrix.artifact_name }}
+          else
+            mv target/${{ matrix.target }}/release/heikal dist/${{ matrix.artifact_name }}
+          fi
+          
+          # Move packages to release distribution folder (Linux only)
+          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
+            mv target/x86_64-unknown-linux-musl/debian/*.deb dist/
+            mv target/x86_64-unknown-linux-musl/generate-rpm/*.rpm dist/
+          fi
+        shell: bash
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
