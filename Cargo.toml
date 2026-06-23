@@ -1,6 +1,6 @@
 [package]
 name = "heikal"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "A terminal RSS reader with bidirectional (Arabic) text shaping"
 homepage = "https://github.com/BooDy/heikal"
