@@ -1,0 +1,22 @@
+[package]
+name = "heikal"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rusqlite = { version = "0.31.0", features = ["bundled", "chrono"] }
+tokio = { version = "1.37.0", features = ["full"] }
+ratatui = "0.26.1"
+crossterm = "0.27.0"
+reqwest = { version = "0.12.4", features = ["json"] }
+feed-rs = "1.5.1"
+unicode-bidi = "0.3.15"
+rustybuzz = "0.12.1"
+font-kit = "0.14.1"
+thiserror = "1.0.61"
+serde = { version = "1.0.203", features = ["derive"] }
+chrono = { version = "0.4.38", features = ["serde"] }
+html2text = "0.12"
+
+[dev-dependencies]
+tempfile = "3.10.1"
