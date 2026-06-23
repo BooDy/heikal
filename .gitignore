@@ -1,0 +1,19 @@
+# Rust build artifacts
+target/
+
+# Local cache databases
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Editor and IDE configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Temporary log / state caches
+log/
+temp/
