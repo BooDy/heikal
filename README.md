@@ -21,7 +21,8 @@ Standard terminal applications write text strictly from left to right. When rend
 - 📊 **Multi-Column Articles View:** Browse articles using a clean table showing the **Title** (with read/unread state markers), **Publish Date**, and **Read/Unread** status.
 - 🌐 **Rich HTML Reader Layout:** Parses and formats HTML contents into clear, readable terminal layouts (supporting list bullet alignment, indentations, and blockquotes) using `html2text`.
 - 🛡️ **Fail-Safe & Silent Logging:** Network/sync failures are silently logged to `~/.local/state/heikal/log` with single-line summary warnings in the status bar, preventing terminal layout corruption.
-- 🖥️ **Stateless & Portable:** Leverages a lightweight local SQLite database (`heikal.db`) for caching feeds and articles.
+- 🤖 **AI-Powered Feed Summaries:** Instantly summarize all unread articles in a feed with a single keypress. Supports major providers (OpenAI, Anthropic, Gemini, OpenRouter) and local models (Ollama/Custom endpoints).
+- 🖥️ **Stateless & Portable:** Leverages a lightweight local SQLite database (`heikal.db`) for caching feeds, articles, and settings.
 
 ---
 
@@ -31,6 +32,7 @@ Heikal is fully keyboard-driven. Navigate the interface with the following hotke
 
 ### Global Controls
 - `?` or `m` : Toggle the Help modal overlay
+- `c`         : Open the interactive **AI frontier Model Configuration** wizard (Provider, Token, Model, Base URL)
 - `q`         : Quit the application
 
 ### Feed Sidebar & Navigation
@@ -40,6 +42,7 @@ Heikal is fully keyboard-driven. Navigate the interface with the following hotke
 - `h` or `Left`  : Return focus to the Feed Sidebar (when in Articles view)
 - `a`            : Open the interactive **Add Feed** dialog modal (Step 1: URL, Step 2: Category)
 - `e`            : Open the interactive **Edit Feed** wizard modal (Step 1: Title, Step 2: URL, Step 3: Category)
+- `s`            : Asynchronously request an **AI Summary** of all unread articles in the selected feed (scroll summary modal with `j/k`)
 
 ### Articles Table
 - `j` or `Down`  : Navigate down the article table
