@@ -74,10 +74,24 @@ You also need the standard development libraries for your platform (SQLite devel
 
 ### 🛠️ Installation
 
+#### 📦 From Precompiled Packages (Debian/RPM)
+If you are on Linux and do not have Rust installed, you can install Heikal via the native packages attached to the [GitHub Releases](https://github.com/BooDy/heikal/releases) page.
+
+##### Debian / Ubuntu (`.deb`)
+```bash
+sudo dpkg -i heikal-*.deb
+```
+
+##### Fedora / RHEL / CentOS (`.rpm`)
+```bash
+sudo rpm -i heikal-*.rpm
+```
+
+#### 🛠️ From Source (Requires Rust/Cargo)
 Clone the repository and build the release binary:
 
 ```bash
-git clone https://github.com/yourusername/heikal.git
+git clone https://github.com/BooDy/heikal.git
 cd heikal
 cargo build --release
 ```
@@ -118,8 +132,8 @@ heikal delete <feed_id>
 
 ## 🗃️ Directories & Logging
 
-Heikal adheres strictly to standard XDG directories:
-- **Local Cache Database:** `heikal.db` in the working directory (SQLite format).
+Heikal configurations and databases are stored locally:
+- **Local Cache Database:** `~/.heikal/heikal.db` (SQLite format). This folder is used to persist your feed configuration, articles, and AI keys.
 - **Error Log File:** `~/.local/state/heikal/log` where malformed feed parser outputs or connection errors are appended.
 
 ---

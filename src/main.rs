@@ -13,12 +13,25 @@ use std::io;
 use std::sync::Arc;
 use std::time::Duration;
 
+fn get_db_path() -> std::path::PathBuf {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".to_string());
+    
+    let mut path = std::path::PathBuf::from(home);
+    path.push(".heikal");
+    let _ = std::fs::create_dir_all(&path);
+    path.push("heikal.db");
+    path
+}
+
 #[tokio::main]
 async fn main() -> heikal::error::Result<()> {
     let args: Vec<String> = std::env::args().collect();
 
     // Initialize DB
-    let storage = Arc::new(SqliteStorage::new("heikal.db")?);
+    let db_path = get_db_path();
+    let storage = Arc::new(SqliteStorage::new(db_path)?);
 
     if args.len() >= 3 && args[1] == "add" {
         let url = &args[2];
