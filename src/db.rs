@@ -27,6 +27,8 @@ pub trait Storage: Send + Sync {
     fn add_articles(&self, articles: Vec<Article>) -> Result<()>;
     fn get_articles_by_feed(&self, feed_id: i64) -> Result<Vec<Article>>;
     fn mark_as_read(&self, article_id: i64) -> Result<()>;
+    fn get_setting(&self, key: &str) -> Result<Option<String>>;
+    fn set_setting(&self, key: &str, value: &str) -> Result<()>;
 }
 
 pub struct SqliteStorage {
@@ -76,6 +78,14 @@ impl SqliteStorage {
                 published DATETIME,
                 is_read BOOLEAN NOT NULL DEFAULT 0,
                 FOREIGN KEY (feed_id) REFERENCES feeds (id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
             )",
             [],
         )?;
@@ -209,6 +219,27 @@ impl Storage for SqliteStorage {
         conn.execute(
             "UPDATE articles SET is_read = 1 WHERE id = ?1",
             params![article_id],
+        )?;
+        Ok(())
+    }
+
+    fn get_setting(&self, key: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
+        let mut rows = stmt.query(params![key])?;
+        if let Some(row) = rows.next()? {
+            let val: String = row.get(0)?;
+            Ok(Some(val))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn set_setting(&self, key: &str, value: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+            params![key, value],
         )?;
         Ok(())
     }

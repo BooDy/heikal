@@ -42,11 +42,31 @@ pub struct App {
     pub edit_input_title: String,
     pub edit_input_url: String,
     pub edit_input_category: String,
+
+    // Frontier model configuration
+    pub show_settings: bool,
+    pub settings_step: u8,
+    pub input_provider: String,
+    pub input_api_token: String,
+    pub input_model: String,
+    pub input_api_base: String,
+
+    // AI Summary state
+    pub show_summary: bool,
+    pub summary_loading: bool,
+    pub summary_content: String,
+    pub summary_feed_title: String,
+    pub summary_scroll: u16,
 }
 
 impl App {
     pub fn new(storage: Arc<dyn Storage>) -> Result<Self> {
         let shaper = TextShaper::new().ok();
+        let provider = storage.get_setting("ai_provider")?.unwrap_or_else(|| "OpenAI".to_string());
+        let api_token = storage.get_setting("ai_api_token")?.unwrap_or_default();
+        let model = storage.get_setting("ai_model")?.unwrap_or_else(|| "gpt-4o".to_string());
+        let api_base = storage.get_setting("ai_api_base")?.unwrap_or_default();
+
         let mut app = Self {
             storage,
             feeds: Vec::new(),
@@ -72,6 +92,19 @@ impl App {
             edit_input_title: String::new(),
             edit_input_url: String::new(),
             edit_input_category: String::new(),
+
+            show_settings: false,
+            settings_step: 0,
+            input_provider: provider,
+            input_api_token: api_token,
+            input_model: model,
+            input_api_base: api_base,
+
+            show_summary: false,
+            summary_loading: false,
+            summary_content: String::new(),
+            summary_feed_title: String::new(),
+            summary_scroll: 0,
         };
         app.refresh_feeds()?;
         Ok(app)

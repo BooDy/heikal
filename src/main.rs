@@ -6,6 +6,7 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 use heikal::app::{App, AppView, FeedUiItem};
 use heikal::db::{SqliteStorage, Storage};
+use heikal::models::Article;
 use heikal::sync::sync_loop;
 use heikal::ui;
 use std::io;
@@ -111,10 +112,20 @@ async fn run_app<B: ratatui::backend::Backend>(
 
         // Check for status updates
         while let Ok(msg) = status_rx.try_recv() {
-            app.status_message = msg;
-            if app.status_message == "Sync complete" {
-                app.refresh_feeds()?;
-                app.refresh_articles()?;
+            if msg.starts_with("AI_SUMMARY_SUCCESS:") {
+                app.summary_content = msg["AI_SUMMARY_SUCCESS:".len()..].to_string();
+                app.summary_loading = false;
+                app.status_message = String::from("Summary generated successfully");
+            } else if msg.starts_with("AI_SUMMARY_ERROR:") {
+                app.summary_content = format!("AI Error: {}", &msg["AI_SUMMARY_ERROR:".len()..]);
+                app.summary_loading = false;
+                app.status_message = String::from("AI summarization failed");
+            } else {
+                app.status_message = msg;
+                if app.status_message == "Sync complete" {
+                    app.refresh_feeds()?;
+                    app.refresh_articles()?;
+                }
             }
         }
 
@@ -271,6 +282,75 @@ async fn run_app<B: ratatui::backend::Backend>(
                         }
                         _ => {}
                     }
+                } else if app.show_settings {
+                    match key.code {
+                        KeyCode::Enter => {
+                            if app.settings_step == 0 {
+                                app.settings_step = 1;
+                            } else if app.settings_step == 1 {
+                                app.settings_step = 2;
+                            } else if app.settings_step == 2 {
+                                app.settings_step = 3;
+                            } else {
+                                let provider = app.input_provider.trim().to_string();
+                                let api_token = app.input_api_token.trim().to_string();
+                                let model = app.input_model.trim().to_string();
+                                let api_base = app.input_api_base.trim().to_string();
+
+                                if !provider.is_empty() && !model.is_empty() {
+                                    let _ = app.storage.set_setting("ai_provider", &provider);
+                                    let _ = app.storage.set_setting("ai_api_token", &api_token);
+                                    let _ = app.storage.set_setting("ai_model", &model);
+                                    let _ = app.storage.set_setting("ai_api_base", &api_base);
+                                    app.status_message = String::from("AI configuration saved successfully");
+                                } else {
+                                    app.status_message = String::from("Provider and Model cannot be empty");
+                                }
+                                app.show_settings = false;
+                                app.settings_step = 0;
+                            }
+                        }
+                        KeyCode::Esc => {
+                            app.show_settings = false;
+                            app.settings_step = 0;
+                        }
+                        KeyCode::Backspace => {
+                            if app.settings_step == 0 {
+                                app.input_provider.pop();
+                            } else if app.settings_step == 1 {
+                                app.input_api_token.pop();
+                            } else if app.settings_step == 2 {
+                                app.input_model.pop();
+                            } else {
+                                app.input_api_base.pop();
+                            }
+                        }
+                        KeyCode::Char(c) => {
+                            if app.settings_step == 0 {
+                                app.input_provider.push(c);
+                            } else if app.settings_step == 1 {
+                                app.input_api_token.push(c);
+                            } else if app.settings_step == 2 {
+                                app.input_model.push(c);
+                            } else {
+                                app.input_api_base.push(c);
+                            }
+                        }
+                        _ => {}
+                    }
+                } else if app.show_summary {
+                    match key.code {
+                        KeyCode::Char('j') | KeyCode::Down => {
+                            app.summary_scroll = app.summary_scroll.saturating_add(1);
+                        }
+                        KeyCode::Char('k') | KeyCode::Up => {
+                            app.summary_scroll = app.summary_scroll.saturating_sub(1);
+                        }
+                        _ => {
+                            app.show_summary = false;
+                            app.summary_scroll = 0;
+                        }
+                    }
                 } else {
                     match key.code {
                         KeyCode::Char('q') => {
@@ -282,6 +362,69 @@ async fn run_app<B: ratatui::backend::Backend>(
                         KeyCode::Char('a') => {
                             app.show_add_feed = true;
                             app.input_feed_url.clear();
+                        }
+                        KeyCode::Char('c') => {
+                            app.show_settings = true;
+                            app.settings_step = 0;
+                        }
+                        KeyCode::Char('s') => {
+                            if app.current_view == AppView::Feeds || app.current_view == AppView::Articles {
+                                let feed_opt = if app.current_view == AppView::Feeds {
+                                    if let Some(FeedUiItem::Feed(feed)) = app.ui_items.get(app.selected_ui_idx) {
+                                        Some(feed.clone())
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    app.feeds.get(app.selected_feed_idx).cloned()
+                                };
+
+                                if let Some(feed) = feed_opt {
+                                    match app.storage.get_articles_by_feed(feed.id) {
+                                        Ok(articles) => {
+                                            let unread: Vec<Article> = articles.into_iter().filter(|a| !a.is_read).collect();
+                                            if unread.is_empty() {
+                                                app.status_message = String::from("No unread articles in this feed to summarize.");
+                                            } else {
+                                                app.show_summary = true;
+                                                app.summary_loading = true;
+                                                app.summary_feed_title = feed.title.clone();
+                                                app.summary_content.clear();
+                                                app.summary_scroll = 0;
+
+                                                let status_tx_clone = status_tx.clone();
+                                                let provider = app.input_provider.clone();
+                                                let api_token = app.input_api_token.clone();
+                                                let model = app.input_model.clone();
+                                                let api_base = app.input_api_base.clone();
+
+                                                tokio::spawn(async move {
+                                                    let _ = status_tx_clone.send(String::from("Requesting AI summary..."));
+                                                    match heikal::ai::summarize_unread(
+                                                        &provider,
+                                                        &api_token,
+                                                        &model,
+                                                        &api_base,
+                                                        &unread,
+                                                    )
+                                                    .await
+                                                    {
+                                                        Ok(summary) => {
+                                                            let _ = status_tx_clone.send(format!("AI_SUMMARY_SUCCESS:{}", summary));
+                                                        }
+                                                        Err(e) => {
+                                                            let _ = status_tx_clone.send(format!("AI_SUMMARY_ERROR:{}", e));
+                                                        }
+                                                    }
+                                                });
+                                            }
+                                        }
+                                        Err(e) => {
+                                            app.status_message = format!("Database error: {}", e);
+                                        }
+                                    }
+                                }
+                            }
                         }
                         KeyCode::Char('e') => {
                             if app.current_view == AppView::Feeds {

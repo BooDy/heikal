@@ -340,3 +340,20 @@ async fn test_app_current_view_flow() {
     // Default view when starting the app is Feeds, which renders the dashboard
     assert_eq!(app.current_view, heikal::app::AppView::Feeds);
 }
+
+#[test]
+fn test_app_settings() {
+    let db_file = NamedTempFile::new().unwrap();
+    let storage = SqliteStorage::new(db_file.path()).unwrap();
+
+    // Verify settings default to None
+    assert!(storage.get_setting("ai_provider").unwrap().is_none());
+
+    // Set settings
+    storage.set_setting("ai_provider", "OpenAI").unwrap();
+    storage.set_setting("ai_model", "gpt-4o").unwrap();
+
+    // Get settings and verify
+    assert_eq!(storage.get_setting("ai_provider").unwrap().unwrap(), "OpenAI");
+    assert_eq!(storage.get_setting("ai_model").unwrap().unwrap(), "gpt-4o");
+}

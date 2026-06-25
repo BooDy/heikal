@@ -48,6 +48,10 @@ pub fn render(f: &mut Frame, app: &mut App) {
         render_add_feed_modal(f, app, f.size());
     } else if app.show_edit_feed {
         render_edit_feed_modal(f, app, f.size());
+    } else if app.show_settings {
+        render_settings_modal(f, app, f.size());
+    } else if app.show_summary {
+        render_summary_modal(f, app, f.size());
     }
 }
 
@@ -284,8 +288,12 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
         "Type URL | [Enter] Confirm | [Esc] Cancel"
     } else if app.show_edit_feed {
         "Type value | [Enter] Next/Confirm | [Esc] Cancel"
+    } else if app.show_settings {
+        "Type setting | [Enter] Next/Confirm | [Esc] Cancel"
+    } else if app.show_summary {
+        "[j/k] Scroll Summary | Press any other key to close"
     } else {
-        "[j/k] Navigate | [Enter] Select | [a] Add Feed | [e] Edit Feed | [r] Sync | [?] Help | [q] Quit"
+        "[j/k] Navigate | [Enter] Select | [a] Add Feed | [e] Edit Feed | [c] AI Config | [s] AI Summary | [r] Sync | [?] Help | [q] Quit"
     };
 
     let clean_status = app
@@ -401,6 +409,8 @@ fn render_landing_page(f: &mut Frame, app: &App, area: Rect) {
         Line::from("      • [h/Left]            : Go back to feeds sidebar / exit article"),
         Line::from("      • [a]                 : Subscribe to new Feed"),
         Line::from("      • [e]                 : Edit current Feed details"),
+        Line::from("      • [c]                 : Configure AI Frontier Model"),
+        Line::from("      • [s]                 : Summarize unread articles using AI"),
         Line::from("      • [o]                 : Open article link in web browser"),
         Line::from("      • [?] / [m]           : Toggle full Help menu"),
         Line::from("      • [q]                 : Quit application"),
@@ -490,6 +500,8 @@ fn render_help_modal(f: &mut Frame, _app: &App, area: Rect) {
         Line::from("     r         : Force background feed sync"),
         Line::from("     a         : Open 'Add Feed' dialog"),
         Line::from("     e         : Open 'Edit Feed' dialog (when selecting a feed)"),
+        Line::from("     c         : Open 'AI frontier Model Configuration'"),
+        Line::from("     s         : Summarize unread articles using AI"),
         Line::from("     ? / m     : Toggle this Help Menu"),
         Line::from("     q / Esc   : Close this menu / Quit application"),
         Line::from(""),
@@ -725,6 +737,204 @@ fn render_edit_feed_modal(f: &mut Frame, app: &App, area: Rect) {
         .wrap(Wrap { trim: false });
 
     f.render_widget(paragraph, popup_area);
+}
+
+fn render_settings_modal(f: &mut Frame, app: &App, area: Rect) {
+    let popup_area = centered_rect(65, 65, area);
+    f.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(ratatui::widgets::BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Cyan))
+        .title(" AI Frontier Model Configuration ")
+        .title_alignment(ratatui::layout::Alignment::Center);
+
+    let mut modal_text = vec![
+        Line::from(""),
+        Line::from(vec![ratatui::text::Span::styled(
+            format!("   Configure Settings (Step {}/4)", app.settings_step + 1),
+            Style::default()
+                .fg(Color::LightBlue)
+                .add_modifier(Modifier::BOLD),
+        )]),
+        Line::from("   ───────────────────────────────"),
+        Line::from(""),
+    ];
+
+    // Field 1: Provider
+    if app.settings_step == 0 {
+        modal_text.push(Line::from(vec![
+            ratatui::text::Span::styled(
+                "   1. Provider (OpenAI/Anthropic/Gemini/OpenRouter/Ollama/Custom):  ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            ratatui::text::Span::styled(
+                format!("> {}█", app.input_provider),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]));
+    } else {
+        modal_text.push(Line::from(vec![
+            ratatui::text::Span::styled("   1. Provider:  ", Style::default().fg(Color::Gray)),
+            ratatui::text::Span::styled(
+                app.input_provider.clone(),
+                Style::default().fg(Color::White),
+            ),
+        ]));
+    }
+    modal_text.push(Line::from(""));
+
+    // Field 2: API Token (masked)
+    let masked_token = if app.input_api_token.is_empty() {
+        String::new()
+    } else if app.settings_step == 1 {
+        format!("{}█", app.input_api_token)
+    } else {
+        "*".repeat(std::cmp::min(app.input_api_token.len(), 16))
+    };
+
+    if app.settings_step == 1 {
+        modal_text.push(Line::from(vec![
+            ratatui::text::Span::styled(
+                "   2. API Token / Key:  ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            ratatui::text::Span::styled(
+                format!("> {}", masked_token),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]));
+    } else {
+        modal_text.push(Line::from(vec![
+            ratatui::text::Span::styled("   2. API Token:        ", Style::default().fg(Color::Gray)),
+            ratatui::text::Span::styled(
+                masked_token,
+                Style::default().fg(Color::White),
+            ),
+        ]));
+    }
+    modal_text.push(Line::from(""));
+
+    // Field 3: Model
+    if app.settings_step == 2 {
+        modal_text.push(Line::from(vec![
+            ratatui::text::Span::styled(
+                "   3. Model Name:  ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            ratatui::text::Span::styled(
+                format!("> {}█", app.input_model),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]));
+    } else {
+        modal_text.push(Line::from(vec![
+            ratatui::text::Span::styled("   3. Model Name:  ", Style::default().fg(Color::Gray)),
+            ratatui::text::Span::styled(
+                app.input_model.clone(),
+                Style::default().fg(Color::White),
+            ),
+        ]));
+    }
+    modal_text.push(Line::from(""));
+
+    // Field 4: Base URL
+    let display_base = if app.input_api_base.is_empty() {
+        "Default for Provider"
+    } else {
+        &app.input_api_base
+    };
+
+    if app.settings_step == 3 {
+        modal_text.push(Line::from(vec![
+            ratatui::text::Span::styled(
+                "   4. API Base URL (optional):  ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            ratatui::text::Span::styled(
+                format!("> {}█", app.input_api_base),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]));
+    } else {
+        modal_text.push(Line::from(vec![
+            ratatui::text::Span::styled("   4. API Base URL:             ", Style::default().fg(Color::Gray)),
+            ratatui::text::Span::styled(
+                display_base.to_string(),
+                Style::default().fg(Color::White),
+            ),
+        ]));
+    }
+
+    modal_text.push(Line::from(""));
+    modal_text.push(Line::from("   ───────────────────────────────"));
+    modal_text.push(Line::from(""));
+    modal_text.push(Line::from(vec![ratatui::text::Span::styled(
+        "   [Enter] Next/Confirm   |   [Esc] Cancel",
+        Style::default().fg(Color::Gray),
+    )]));
+    modal_text.push(Line::from(""));
+
+    let paragraph = Paragraph::new(modal_text)
+        .block(block)
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(paragraph, popup_area);
+}
+
+fn render_summary_modal(f: &mut Frame, app: &mut App, area: Rect) {
+    let popup_area = centered_rect(80, 80, area);
+    f.render_widget(Clear, popup_area);
+
+    let border_color = if app.summary_loading {
+        Color::Yellow
+    } else {
+        Color::Green
+    };
+
+    let title = format!(" AI Summary of Unread Articles in '{}' ", app.summary_feed_title);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(ratatui::widgets::BorderType::Rounded)
+        .border_style(Style::default().fg(border_color))
+        .title(title)
+        .title_alignment(ratatui::layout::Alignment::Center);
+
+    if app.summary_loading {
+        let loading_text = vec![
+            Line::from(""),
+            Line::from(vec![ratatui::text::Span::styled(
+                "   🤖 Requesting summary from AI model... Please wait...",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )]),
+            Line::from(""),
+        ];
+        let paragraph = Paragraph::new(loading_text).block(block);
+        f.render_widget(paragraph, popup_area);
+    } else {
+        let width = popup_area.width.saturating_sub(4) as usize;
+        let shaped_lines = shape_text(app.shaper.as_ref(), &app.summary_content, width);
+        let text: Vec<Line> = shaped_lines.into_iter().map(Line::from).collect();
+
+        let paragraph = Paragraph::new(text)
+            .block(block)
+            .wrap(Wrap { trim: false })
+            .scroll((app.summary_scroll, 0));
+        
+        f.render_widget(paragraph, popup_area);
+    }
 }
 
 #[cfg(test)]
